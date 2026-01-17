@@ -2,32 +2,47 @@ const params = new URLSearchParams(window.location.search);
 
 const overlay = document.getElementById("overlay");
 const panel = document.getElementById("panel");
+const header = document.getElementById("header");
 const titleEl = document.getElementById("title");
 const kickerEl = document.getElementById("kicker");
 const listEl = document.getElementById("list");
 
-const title = params.get("title") || "Agenda";
-const kicker = params.get("kicker") || "PONTOS DA LIVE";
-const mode = (params.get("mode") || "auto").toLowerCase(); // auto | full | dock
-const dock = (params.get("dock") || "tr").toLowerCase();   // tr|tl|br|bl
-const hold = Math.max(0, parseFloat(params.get("hold") || "3")); // segundos antes de fazer dock (no auto)
+// Config
+const dock = (params.get("dock") || "tr").toLowerCase(); // tr|tl|br|bl
+const activeIndex = Math.max(0, parseInt(params.get("active") || "0", 10)); // 0 = nenhum
 const speed = Math.max(0.4, Math.min(2.0, parseFloat(params.get("speed") || "1"))); // 0.4..2
-const activeIndex = Math.max(1, parseInt(params.get("active") || "1", 10)); // item ativo
+
+// Cor (hex sem #) ex: accent=FFB020
+const accentHex = (params.get("accent") || "").trim().replace("#", "");
+if (/^[0-9a-fA-F]{6}$/.test(accentHex)) {
+  panel.style.setProperty("--accent", `#${accentHex}`);
+}
 
 // Tempos
 const t = Math.round(900 / speed);
 panel.style.setProperty("--t", `${t}ms`);
 
-titleEl.textContent = decodeURIComponent(title);
-kickerEl.textContent = decodeURIComponent(kicker);
+// Dock class
+overlay.classList.remove("tl","tr","bl","br");
+overlay.classList.add(dock);
 
-// Lê itens item1..item10
+// Header opcional (se não houver title/kicker, não aparece)
+const title = (params.get("title") || "").trim();
+const kicker = (params.get("kicker") || "").trim();
+
+titleEl.textContent = title ? decodeURIComponent(title) : "";
+kickerEl.textContent = kicker ? decodeURIComponent(kicker) : "";
+
+if (!title && !kicker) header.classList.add("hide");
+
+// Itens item1..item10 (só os preenchidos)
 const items = [];
 for (let i = 1; i <= 10; i++) {
   const v = params.get(`item${i}`);
   if (v && decodeURIComponent(v).trim()) items.push(decodeURIComponent(v).trim());
 }
 
+// fallback para não ficar “vazio” se alguém abrir sem params
 if (!items.length) {
   items.push("Introdução", "Manifesto", "Os Líderes", "Matrioska", "O caminho");
 }
@@ -37,7 +52,7 @@ listEl.innerHTML = "";
 items.forEach((txt, idx) => {
   const li = document.createElement("li");
   li.className = "item";
-  if (idx + 1 === activeIndex) li.classList.add("active");
+  if (activeIndex > 0 && idx + 1 === activeIndex) li.classList.add("active");
 
   const badge = document.createElement("div");
   badge.className = "badge";
@@ -51,28 +66,9 @@ items.forEach((txt, idx) => {
   li.appendChild(text);
   listEl.appendChild(li);
 
-  // stagger (entrada)
-  li.style.transitionDelay = `${120 + idx * 80}ms`;
+  // stagger entrada
+  li.style.transitionDelay = `${120 + idx * 70}ms`;
 });
 
 // Entrada
 requestAnimationFrame(() => panel.classList.add("ready"));
-
-// Dock control
-function setDock(on){
-  overlay.classList.toggle("dock", on);
-  overlay.classList.remove("tl","tr","bl","br");
-  overlay.classList.add(dock);
-}
-
-if (mode === "dock") {
-  setDock(true);
-} else if (mode === "full") {
-  setDock(false);
-} else {
-  // auto: full -> dock depois de X segundos
-  setDock(false);
-  if (hold > 0) {
-    setTimeout(() => setDock(true), hold * 1000);
-  }
-}
